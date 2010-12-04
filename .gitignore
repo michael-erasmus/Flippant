@@ -1,0 +1,5 @@
+*.gem
+pkg
+rdoc
+.bundle
+*.swp
