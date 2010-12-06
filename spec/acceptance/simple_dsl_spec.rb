@@ -1,6 +1,4 @@
-require 'steak'
-require File.join(File.dirname(__FILE__), %w[.. .. lib flippant]) 
-include Flippant
+require File.join(File.dirname(__FILE__), %w[.. spec_helper]) 
 
 feature "Simple Flippant Dsl" do
   background do 
@@ -8,13 +6,12 @@ feature "Simple Flippant Dsl" do
     end
   end
 
-
-  scenario "Module level dsl method that maps to a specified constant" do |s|
+  scenario "Module level dsl method that maps to a specified constant" do 
     Flippant.dsl_method :person, Person 
     person.should be_a_kind_of Person
   end
 
-  scenario "Module level dsl method that maps to a specified lambda" do |s|
+  scenario "Module level dsl method that maps to a specified lambda" do 
     Flippant.dsl_method :person do
       maps_to{Person.new}
     end
@@ -32,5 +29,4 @@ feature "Simple Flippant Dsl" do
     instance = Person.dsl
     instance.should be_a_kind_of OpenStruct 
   end
-
 end
