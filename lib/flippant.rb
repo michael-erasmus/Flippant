@@ -4,9 +4,15 @@ require 'ostruct'
 
 module Flippant
   class DslMethod
+    attr_reader :name
+
     def initialize(*args, &dsl_code)
-      klass = args[0] || OpenStruct 
-      @returns_instance = lambda{return klass.new}
+      if args[0].instance_of? Hash
+        @name, klass = args[0].delete(:name), args[0].delete(:maps_to)
+      else
+       @name, klass = args[0], args[1] || OpenStruct 
+      end
+      @returns_instance = lambda{|*args|return klass.new(*args)}
       instance_eval(&dsl_code) if block_given?
     end
 
@@ -32,30 +38,31 @@ module Flippant
       return dsl
     end
 
-    def new_instance(*properties, &instance_code)
-      instance = @returns_instance.call
-      properties[0].each_pair do |k,v|
+    def new_instance(*args, &instance_code)
+      properties = args.last.instance_of?(Hash) ? args.pop : {}
+      instance = @returns_instance.call(*args)
+      properties.each_pair do |k,v|
         instance.send("#{k.to_s}=",v)
-      end unless properties.length == 0 
+      end  
       instance.instance_eval(&instance_code) if block_given?   
       instance
     end
   end
   
-  def self.dsl_method(name, *args, &dsl_code)
+  def self.dsl_method(*args, &dsl_code)
     dsl = DslMethod.new(*args, &dsl_code)
     
-    dsl.methods << define_method(name) do |*properties,&instance_code| 
-      dsl.new_instance(*properties, &instance_code) 
+    dsl.methods << define_method(dsl.name) do |*instance_args,&instance_code| 
+      dsl.new_instance(*instance_args, &instance_code) 
     end
     return dsl
   end
 
-  Object.send(:define_method, "dsl_method") do |name, *args, &dsl_code|
+  Object.send(:define_method, "dsl_method") do |*args, &dsl_code|
     dsl = DslMethod.new(*args, &dsl_code)
     
-    dsl.methods << Object.send(:define_method, name) do |*properties,&instance_code| 
-      dsl.new_instance(*properties, &instance_code) 
+    dsl.methods << Object.send(:define_method, dsl.name) do |*instance_args,&instance_code| 
+      dsl.new_instance(*instance_args, &instance_code) 
     end
     return dsl
   end
