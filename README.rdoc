@@ -1,0 +1,63 @@
+= Flippant
+
+A DSL for making DSLs
+
+== What is Flippant?
+
+Flippant is a DSL that you use to build a DSL on top of your existing domain 
+objects.
+The idea behind it is to seperate the your domain language logic from your 
+actual domain logic.
+It's DSL does this by decorating your Domain classes with DSL methods. It also 
+has support for building DSLs on the fly without any pre-existing domain classes.
+
+It's goal is to be a lightweight and flexible DSL for describing your own DSL.
+This is how an DSL specification looks like in Flippant:
+
+  #Say you have this
+  class Movie
+    attr_accessor :name
+    attr_accessor :actors
+                   
+    def initialize(name)
+      @name = name
+      @actors = []
+    end
+
+  end
+
+  class Director end
+
+  class Actor 
+    attr_accessor :name
+  end
+
+  #And you describe your DSL like this
+  require "flippant"
+  include Flippant
+
+  Flippant.dsl_method :name => :movie, :maps_to => Movie do
+    
+    assign_property_method  :name => :director, :maps_to => Director
+
+    add_item_method :name => :actor, :maps_to => Actor do
+      add_item_method :name => :also_stars_in, :maps_to => Movie 
+    end
+  end
+
+  #Then you can do stuff like
+  fight_club = movie "Fight Club" do
+    director :name => "David Fincher"
+    actor "Brad Pitt" do
+      also_stars_in "Inglourious Basterds"
+      also_stars_in "Babel"
+    end
+    actor :name => "Edward Norton"
+  end
+
+
+=== Whats with the name?
+
+The Meriam-Webster dictionary defines the word Flippant as  _lacking proper respect or seriousness_ 
+
+I think its pretty fitting
