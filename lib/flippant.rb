@@ -24,16 +24,30 @@ module Flippant
       @returns_instance = instance_code
     end
 
-    def add_item_method(name, &dsl_code)
-      dsl = block_given? ? DslMethod.new(&dsl_code) : DslMethod.new
-      collection_name = name.to_s.pluralize
+    def add_item_method(*args, &dsl_code)
+      dsl = DslMethod.new(*args, &dsl_code) 
+      collection_name = args[0].delete(:collection_name) || dsl.name.to_s.pluralize
       unless new_instance.respond_to? collection_name
-        instance_class.class_eval{ attr_accessor name.to_s.pluralize.to_sym}
+        instance_class.class_eval{ attr_accessor collection_name}
       end
-      instance_class.send(:define_method, name) do |*properties, &instance_code|
+      instance_class.send(:define_method, dsl.name) do |*properties, &instance_code|
         item = dsl.new_instance(*properties, &instance_code)
         send("#{collection_name}=", []) if send(collection_name).nil?
         send(collection_name) << item
+      end
+      return dsl
+    end
+
+    def assign_property_method(*args, &dsl_code)
+      dsl = DslMethod.new(*args, &dsl_code)
+      property_name = args[0].delete(:property_name) 
+      unless new_instance.respond_to? property_name
+        instance_class.class_eval{ attr_accessor property_name}
+      end
+      instance_class.send(:define_method, dsl.name) do |*properties, &instance_code|
+        item = dsl.new_instance(*properties, &instance_code)
+        send("#{property_name}=", item) 
+        item
       end
       return dsl
     end
@@ -59,6 +73,11 @@ module Flippant
   end
 
   Object.send(:define_method, "dsl_method") do |*args, &dsl_code|
+    if args[0].is_a?(Hash)
+      args[0][:maps_to] = self if args[0][:maps_to].nil?
+    else
+      args.insert(1, self) unless args[0].is_a?(Class)
+    end
     dsl = DslMethod.new(*args, &dsl_code)
     
     dsl.methods << Object.send(:define_method, dsl.name) do |*instance_args,&instance_code| 
