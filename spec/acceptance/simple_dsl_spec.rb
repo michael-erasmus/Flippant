@@ -47,4 +47,11 @@ feature "Simple Flippant Dsl" do
      human.species.should == "homo sapien"
      human.location.should == "everywhere"
   end
+  scenario "dsl that uses the argument style" do
+    Flippant.dsl_method :arg_animal, Animal
+    horse = arg_animal "horse" do |a|  
+      a.location = "farm"
+    end
+    horse.location.should == "farm"
+  end
 end

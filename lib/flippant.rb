@@ -58,7 +58,11 @@ module Flippant
       properties.each_pair do |k,v|
         instance.send("#{k.to_s}=",v)
       end  
-      instance.instance_eval(&instance_code) if block_given?   
+      if block_given? && instance_code.arity == 1
+        instance_code[instance]
+      elsif block_given?
+        instance.instance_eval(&instance_code) if block_given?   
+      end 
       instance
     end
   end
