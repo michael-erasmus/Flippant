@@ -5,19 +5,16 @@ require 'ostruct'
 module Flippant
   class DslMethod
     attr_reader :name
+    attr_reader :instance_class
 
     def initialize(*args, &dsl_code)
-      if args[0].instance_of? Hash
-        @name, klass = args[0].delete(:name), args[0].delete(:maps_to)
+      if args[0].is_a? Hash
+        @name, @instance_class = args[0].delete(:name), args[0].delete(:maps_to)
       else
-       @name, klass = args[0], args[1] || OpenStruct 
+       @name, @instance_class = args[0], args[1] || OpenStruct 
       end
-      @returns_instance = lambda{|*args|return klass.new(*args)}
+      @returns_instance = lambda{|*args|return @instance_class.new(*args)}
       instance_eval(&dsl_code) if block_given?
-    end
-
-    def instance_class
-      new_instance.class
     end
 
     def maps_to(&instance_code)
@@ -26,8 +23,13 @@ module Flippant
 
     def add_item_method(*args, &dsl_code)
       dsl = DslMethod.new(*args, &dsl_code) 
-      collection_name = args[0].delete(:collection_name) || dsl.name.to_s.pluralize
-      unless new_instance.respond_to? collection_name
+      collection_name = 
+        if args[0].is_a?(Hash) and args[0].include?(:collection_name) 
+          args[0].delete(:collection_name) 
+        else
+          dsl.name.to_s.pluralize
+        end
+      unless @instance_class.instance_methods.include? collection_name
         instance_class.class_eval{ attr_accessor collection_name}
       end
       instance_class.send(:define_method, dsl.name) do |*properties, &instance_code|
@@ -41,7 +43,7 @@ module Flippant
     def assign_property_method(*args, &dsl_code)
       dsl = DslMethod.new(*args, &dsl_code)
       property_name = args[0].delete(:property_name) 
-      unless new_instance.respond_to? property_name
+      unless @instance_class.instance_methods.include? property_name
         instance_class.class_eval{ attr_accessor property_name}
       end
       instance_class.send(:define_method, dsl.name) do |*properties, &instance_code|
@@ -54,6 +56,7 @@ module Flippant
 
     def new_instance(*args, &instance_code)
       properties = args.last.instance_of?(Hash) ? args.pop : {}
+    
       instance = @returns_instance.call(*args)
       properties.each_pair do |k,v|
         instance.send("#{k.to_s}=",v)
