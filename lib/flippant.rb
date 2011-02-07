@@ -1,24 +1,26 @@
 require 'rubygems'
 require 'active_support/inflector'
 require 'ostruct'
+require './minter.rb'
 
 module Flippant
   class DslMethod
     attr_reader :name
-    attr_reader :instance_class
+    attr_reader :klass
 
     def initialize(*args, &dsl_code)
       if args[0].is_a? Hash
-        @name, @instance_class = args[0].delete(:name), args[0].delete(:maps_to)
+        @name, @klass= args[0].delete(:name), args[0].delete(:maps_to)
       else
-       @name, @instance_class = args[0], args[1] || OpenStruct 
+       @name, @klass= args[0], args[1] || OpenStruct 
       end
-      @returns_instance = lambda{|*args|return @instance_class.new(*args)}
+      @returns_instance = lambda{|*args|return @klass.new(*args)}
+      @minter = Minter.new @returns_instance
       instance_eval(&dsl_code) if block_given?
     end
 
     def maps_to(&instance_code)
-      @returns_instance = instance_code
+      @minter.instance_code = instance_code
     end
 
     def add_item_method(*args, &dsl_code)
@@ -29,24 +31,17 @@ module Flippant
         else
           dsl.name.to_s.pluralize
         end
-      unless @instance_class.instance_methods.include? collection_name
-        instance_class.class_eval{ attr_accessor collection_name}
-      end
-      instance_class.send(:define_method, dsl.name) do |*properties, &instance_code|
-        item = dsl.new_instance(*properties, &instance_code)
-        send("#{collection_name}=", []) if send(collection_name).nil?
-        send(collection_name) << item
-      end
+      @minter.collection_methods[collection_name] = dsl   
       return dsl
     end
 
     def assign_property_method(*args, &dsl_code)
       dsl = DslMethod.new(*args, &dsl_code)
       property_name = args[0].delete(:property_name) 
-      unless @instance_class.instance_methods.include? property_name
-        instance_class.class_eval{ attr_accessor property_name}
+      unless @klass.instance_methods.include? property_name
+        klass.class_eval{ attr_accessor property_name}
       end
-      instance_class.send(:define_method, dsl.name) do |*properties, &instance_code|
+      klass.send(:define_method, dsl.name) do |*properties, &instance_code|
         item = dsl.new_instance(*properties, &instance_code)
         send("#{property_name}=", item) 
         item
@@ -55,18 +50,7 @@ module Flippant
     end
 
     def new_instance(*args, &instance_code)
-      properties = args.last.instance_of?(Hash) ? args.pop : {}
-    
-      instance = @returns_instance.call(*args)
-      properties.each_pair do |k,v|
-        instance.send("#{k.to_s}=",v)
-      end  
-      if block_given? && instance_code.arity == 1
-        instance_code[instance]
-      elsif block_given?
-        instance.instance_eval(&instance_code) if block_given?   
-      end 
-      instance
+      @minter.instance(*args, &instance_code)
     end
   end
   
