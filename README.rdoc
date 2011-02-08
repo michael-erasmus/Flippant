@@ -14,6 +14,8 @@ has support for building DSLs on the fly without any pre-existing domain classes
 It's goal is to be a lightweight and flexible DSL for describing your own DSL.
 This is how an DSL specification looks like in Flippant:
 
+  require_relative "../lib/flippant"
+
   #Say you have this
   class Movie
     attr_accessor :name
@@ -21,35 +23,43 @@ This is how an DSL specification looks like in Flippant:
 
     def initialize(name)
       @name = name
-      @actors = []
     end
 
+    def describe
+      <<-eos
+        The movie name is #{@name}
+        It's directed by #{@director.name}
+        Actors: #{@actors.map{|a| a.name}}
+      eos
+    end
   end
 
-  class Director 
+  class Director
     attr_accessor :name
   end
 
   class Actor
     attr_accessor :name
-    
+
     def initialize(name)
       @name = name
     end
-
   end
 
   #And you describe your DSL like this
   Flippant.dsl_method :movie, Movie do
 
-    assign_property_method :name => :directed_by, :property_name => :director, :maps_to => Director
+    assign_property_method :name => :directed_by, :property_name => :director,:maps_to => Director 
 
-    add_item_method :name => :starring, :maps_to => Actor do 
-      add_item_method :name => :also_stars_in, :maps_to => Movie
+    add_item_method :name => :starring, :collection_name => :actors, :maps_to => Actor do
+      add_item_method :name => :also_stars_in, :collection_name => :movies, :maps_to => Movie
     end
   end
 
   #Then you can do stuff like
+
+  include Flippant
+
   fight_club = movie "Fight Club" do
     directed_by :name => "David Fincher"
     starring "Brad Pitt" do
@@ -58,6 +68,7 @@ This is how an DSL specification looks like in Flippant:
     end
     starring "Edward Norton"
   end
+  puts fight_club.describe
 
   #You can also use class methods if you prefer
   Movie.dsl_method :name => :describe do
