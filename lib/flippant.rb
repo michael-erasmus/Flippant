@@ -1,21 +1,20 @@
 require 'rubygems'
 require 'active_support/inflector'
 require 'ostruct'
-require './minter.rb'
+require_relative './minter.rb'
 
 module Flippant
   class DslMethod
     attr_reader :name
-    attr_reader :klass
 
     def initialize(*args, &dsl_code)
       if args[0].is_a? Hash
-        @name, @klass= args[0].delete(:name), args[0].delete(:maps_to)
+        @name, klass= args[0].delete(:name), args[0].delete(:maps_to)
       else
-       @name, @klass= args[0], args[1] || OpenStruct 
+       @name, klass= args[0], args[1] || OpenStruct 
       end
-      @returns_instance = lambda{|*args|return @klass.new(*args)}
-      @minter = Minter.new @returns_instance
+      instance_code = lambda{|*args|return klass.new(*args)}
+      @minter = Minter.new instance_code 
       instance_eval(&dsl_code) if block_given?
     end
 
@@ -38,14 +37,7 @@ module Flippant
     def assign_property_method(*args, &dsl_code)
       dsl = DslMethod.new(*args, &dsl_code)
       property_name = args[0].delete(:property_name) 
-      unless @klass.instance_methods.include? property_name
-        klass.class_eval{ attr_accessor property_name}
-      end
-      klass.send(:define_method, dsl.name) do |*properties, &instance_code|
-        item = dsl.new_instance(*properties, &instance_code)
-        send("#{property_name}=", item) 
-        item
-      end
+      @minter.assign_property_methods[property_name] = dsl
       return dsl
     end
 
