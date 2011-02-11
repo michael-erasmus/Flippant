@@ -2,6 +2,7 @@ require 'rubygems'
 require 'active_support/inflector'
 require 'ostruct'
 require_relative './minter.rb'
+require_relative './instance_maker.rb'
 
 module Flippant
   class DslMethod
@@ -14,12 +15,13 @@ module Flippant
        @name, klass= args[0], args[1] || OpenStruct 
       end
       instance_code = lambda{|*args|return klass.new(*args)}
-      @minter = Minter.new instance_code 
+      @minter = Minter.new instance_code
+      @instance_maker = InstanceMaker.new instance_code
       instance_eval(&dsl_code) if block_given?
     end
 
     def maps_to(&instance_code)
-      @minter.instance_code = instance_code
+      @instance_maker.instance_code = instance_code
     end
 
     def add_item_method(*args, &dsl_code)
@@ -42,7 +44,7 @@ module Flippant
     end
 
     def new_instance(*args, &instance_code)
-      @minter.instance(*args, &instance_code)
+      @instance_maker.instance(@minter,*args, &instance_code)
     end
   end
   
